@@ -36,6 +36,8 @@ define tomcat::service (
   $start_command  = undef,
   $stop_command   = undef,
   $user           = undef,
+  $cwd            = undef,
+  $wait_timeout   = 10,
 ) {
   include tomcat
   $_user = pick($user, $::tomcat::user)
@@ -49,6 +51,8 @@ define tomcat::service (
   $_catalina_base = pick($catalina_base, $_catalina_home) #default to home
   tag(sha1($_catalina_home))
   tag(sha1($_catalina_base))
+
+  $_cwd = pick($cwd, "${_catalina_base}/bin")
 
   validate_bool($use_jsvc)
   validate_bool($use_init)
@@ -105,6 +109,7 @@ define tomcat::service (
       $_start = "export CATALINA_HOME=${_catalina_home}; export CATALINA_BASE=${_catalina_base}; \
                  \$CATALINA_HOME/bin/jsvc \
                    ${_jsvc_home}-user ${_user} \
+                   -cwd ${_cwd} \
                    -classpath \$CATALINA_HOME/bin/bootstrap.jar:\$CATALINA_HOME/bin/tomcat-juli.jar \
                    -outfile \$CATALINA_BASE/logs/catalina.out \
                    -errfile \$CATALINA_BASE/logs/catalina.err \
