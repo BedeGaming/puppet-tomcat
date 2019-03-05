@@ -79,104 +79,108 @@ define tomcat::service (
 
   if $use_jsvc and $use_init {
     $_service_name = "tomcat-${name}"
-    $_hasstatus    = true
-    $_hasrestart   = true
-    $_start        = "service tomcat-${name} start"
-    $_stop         = "service tomcat-${name} stop"
-    $_status       = "service tomcat-${name} status"
-    $_provider     = undef
+    $_provider     = 'init'
     # Template uses:
     # - $_catalina_home
     # - $_catalina_base
     # - $java_home
     # - $_user
+    # - $_cwd
+    # - $wait_timeout
     file { "/etc/init.d/tomcat-${name}":
       mode    => '0755',
       content => template('tomcat/jsvc-init.erb'),
+    } -> 
+    service { $_service_name:
+      ensure   => $service_ensure,
+      enable   => $_service_enable,
+      provider => $_provider,
     }
-  } elsif $use_jsvc {
-    if $java_home {
-      $_jsvc_home = "-home ${java_home} "
-    } else {
-      $_jsvc_home = undef
-    }
-    $_service_name = "tomcat-${name}"
-    $_hasstatus    = false
-    $_hasrestart   = false
-    if $start_command {
-      $_start = $start_command
-    } else {
-      $_start = "export CATALINA_HOME=${_catalina_home}; export CATALINA_BASE=${_catalina_base}; \
-                 \$CATALINA_HOME/bin/jsvc \
-                   ${_jsvc_home}-user ${_user} \
-                   -cwd ${_cwd} \
-                   -classpath \$CATALINA_HOME/bin/bootstrap.jar:\$CATALINA_HOME/bin/tomcat-juli.jar \
-                   -outfile \$CATALINA_BASE/logs/catalina.out \
-                   -errfile \$CATALINA_BASE/logs/catalina.err \
-                   -pidfile \$CATALINA_BASE/logs/jsvc.pid \
-                   -Dcatalina.home=\$CATALINA_HOME \
-                   -Dcatalina.base=\$CATALINA_BASE \
-                   -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager \
-                   -Djava.util.logging.config.file=\$CATALINA_BASE/conf/logging.properties \
-                   org.apache.catalina.startup.Bootstrap"
-    }
-    if $stop_command {
-      $_stop = $stop_command
-    } else {
-      $_stop = "export CATALINA_HOME=${_catalina_home}; export CATALINA_BASE=${_catalina_base};
-                 \$CATALINA_HOME/bin/jsvc \
-                   -pidfile \$CATALINA_BASE/logs/jsvc.pid \
-                   -stop org.apache.catalina.startup.Bootstrap"
-    }
-    $_status       = "ps p `cat ${_catalina_base}/logs/jsvc.pid` > /dev/null"
-    $_provider     = 'base'
-  } elsif $use_init {
-    $_service_name = $service_name
-    $_hasstatus    = true
-    $_hasrestart   = true
-    $_start        = $start_command
-    $_stop         = $stop_command
-    $_status       = undef
-    $_provider     = undef
   } else {
-    $_service_name = "tomcat-${name}"
-    $_hasstatus    = false
-    $_hasrestart   = false
-    $_start        = $start_command ? {
-      undef   => "su -s /bin/bash -c 'CATALINA_HOME=${_catalina_home} CATALINA_BASE=${_catalina_base} ${_catalina_home}/bin/catalina.sh start' ${_user}",
-      default => $start_command
-    }
-    $_stop         = $stop_command ? {
-      undef   => "su -s /bin/bash -c 'CATALINA_HOME=${_catalina_home} CATALINA_BASE=${_catalina_base} ${_catalina_home}/bin/catalina.sh stop' ${_user}",
-      default => $stop_command
-    }
-    $_status       = "ps aux | grep 'catalina.base=${_catalina_base} ' | grep -v grep"
-    $_provider     = 'base'
-  }
-
-  if $use_init {
-    if $service_enable != undef {
-      validate_bool($service_enable)
-      $_service_enable = $service_enable
-    } else {
-      $_service_enable = $service_ensure ? {
-        'running' => true,
-        true      => true,
-        default   => undef,
+    if $use_jsvc {
+      if $java_home {
+        $_jsvc_home = "-home ${java_home} "
+      } else {
+        $_jsvc_home = undef
       }
+      $_service_name = "tomcat-${name}"
+      $_hasstatus    = false
+      $_hasrestart   = false
+      if $start_command {
+        $_start = $start_command
+      } else {
+        $_start = "export CATALINA_HOME=${_catalina_home}; export CATALINA_BASE=${_catalina_base}; \
+                  \$CATALINA_HOME/bin/jsvc \
+                    ${_jsvc_home}-user ${_user} \
+                    -cwd ${_cwd} \
+                    -classpath \$CATALINA_HOME/bin/bootstrap.jar:\$CATALINA_HOME/bin/tomcat-juli.jar \
+                    -outfile \$CATALINA_BASE/logs/catalina.out \
+                    -errfile \$CATALINA_BASE/logs/catalina.err \
+                    -pidfile \$CATALINA_BASE/logs/jsvc.pid \
+                    -Dcatalina.home=\$CATALINA_HOME \
+                    -Dcatalina.base=\$CATALINA_BASE \
+                    -Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager \
+                    -Djava.util.logging.config.file=\$CATALINA_BASE/conf/logging.properties \
+                    org.apache.catalina.startup.Bootstrap"
+      }
+      if $stop_command {
+        $_stop = $stop_command
+      } else {
+        $_stop = "export CATALINA_HOME=${_catalina_home}; export CATALINA_BASE=${_catalina_base};
+                  \$CATALINA_HOME/bin/jsvc \
+                    -pidfile \$CATALINA_BASE/logs/jsvc.pid \
+                    -stop org.apache.catalina.startup.Bootstrap"
+      }
+      $_status       = "ps p `cat ${_catalina_base}/logs/jsvc.pid` > /dev/null"
+      $_provider     = 'base'
+    } elsif $use_init {
+      $_service_name = $service_name
+      $_hasstatus    = true
+      $_hasrestart   = true
+      $_start        = $start_command
+      $_stop         = $stop_command
+      $_status       = undef
+      $_provider     = undef
+    } else {
+      $_service_name = "tomcat-${name}"
+      $_hasstatus    = false
+      $_hasrestart   = false
+      $_start        = $start_command ? {
+        undef   => "su -s /bin/bash -c 'CATALINA_HOME=${_catalina_home} CATALINA_BASE=${_catalina_base} ${_catalina_home}/bin/catalina.sh start' ${_user}",
+        default => $start_command
+      }
+      $_stop         = $stop_command ? {
+        undef   => "su -s /bin/bash -c 'CATALINA_HOME=${_catalina_home} CATALINA_BASE=${_catalina_base} ${_catalina_home}/bin/catalina.sh stop' ${_user}",
+        default => $stop_command
+      }
+      $_status       = "ps aux | grep 'catalina.base=${_catalina_base} ' | grep -v grep"
+      $_provider     = 'base'
     }
-  } else {
-    $_service_enable = undef
-  }
 
-  service { $_service_name:
-    ensure     => $service_ensure,
-    enable     => $_service_enable,
-    hasstatus  => $_hasstatus,
-    hasrestart => $_hasrestart,
-    start      => $_start,
-    stop       => $_stop,
-    status     => $_status,
-    provider   => $_provider,
+    if $use_init {
+      if $service_enable != undef {
+        validate_bool($service_enable)
+        $_service_enable = $service_enable
+      } else {
+        $_service_enable = $service_ensure ? {
+          'running' => true,
+          true      => true,
+          default   => undef,
+        }
+      }
+    } else {
+      $_service_enable = undef
+    }
+
+    service { $_service_name:
+      ensure     => $service_ensure,
+      enable     => $_service_enable,
+      hasstatus  => $_hasstatus,
+      hasrestart => $_hasrestart,
+      start      => $_start,
+      stop       => $_stop,
+      status     => $_status,
+      provider   => $_provider,
+    }
   }
 }
